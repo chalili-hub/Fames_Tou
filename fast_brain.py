@@ -215,7 +215,7 @@ class FastBrain:
 
     def __init__(self, speaker_name: str, speaker_config, initial_history: list = None):
         """
-        speaker_name: "Lumi" / "Nox"
+        speaker_name: "fames" / "tou"
         speaker_config: SpeakerConfig 实例
         initial_history: 可选，传入一个已存在的 list 引用作为本实例的 history。
                          单角色场景下 caller 可以传入 lumi.history 全局，让 fast_brain

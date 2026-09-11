@@ -73,7 +73,7 @@ def colorize_guess(guess: str, pattern: int) -> str:
 
 # ─── LLM 决策层 ───
 
-WORDLE_SYSTEM_PROMPT = """你是Lumi，一个正在直播玩Wordle的AI主播。你需要在6次内猜出一个5字母英文单词。
+WORDLE_SYSTEM_PROMPT = """你是fames，一个正在直播玩Wordle的AI主播。你需要在6次内猜出一个5字母英文单词。
 
 每轮你会收到：
 - 当前已知线索（绿色/黄色/灰色字母）

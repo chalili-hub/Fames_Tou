@@ -24,3 +24,6 @@ recordings/
 Thumbs.db
 .idea/
 .vscode/
+
+# 上游示例角色的立绘（本项目已换成自己的角色，README 不再引用）
+docs/assets/hero.png

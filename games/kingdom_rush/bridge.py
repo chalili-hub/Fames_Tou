@@ -1,5 +1,5 @@
 """
-Kingdom Rush 游戏桥接模块 - 作为 Lumi 子模块运行
+Kingdom Rush 游戏桥接模块 - 作为 fames 子模块运行
 封装 auto_loop 为后台线程，通过 event_callback 推送游戏事件给 lumi.py
 
 可独立测试：python -m games.kingdom_rush.bridge
@@ -36,7 +36,7 @@ KR_GAME_PROMPT = KR_GAME_PROMPT_CONTROLLER
 
 
 class KingdomRushBridge:
-    """Lumi ↔ Kingdom Rush 桥接层
+    """fames ↔ Kingdom Rush 桥接层
 
     在后台线程运行 auto_loop（自动选关→对战→换关），
     通过 event_callback 推送游戏事件/状态给 lumi.py。

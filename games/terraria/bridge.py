@@ -1,5 +1,5 @@
 """
-泰拉瑞亚游戏桥接模块 - 作为 Lumi 子模块运行
+泰拉瑞亚游戏桥接模块 - 作为 fames 子模块运行
 管理游戏连接、运行 survival_loop、事件回调、目标队列
 
 可独立测试：python -m games.terraria.bridge
@@ -97,7 +97,7 @@ TERRARIA_GOAL_TOOL = {
 
 
 class TerrariaBridge:
-    """Lumi ↔ 泰拉瑞亚桥接层
+    """fames ↔ 泰拉瑞亚桥接层
 
     管理游戏连接生命周期，在后台线程运行 survival_loop，
     通过 event_callback 推送游戏事件/状态给 lumi.py。
@@ -401,7 +401,7 @@ class TerrariaBridge:
         runner = self._runner
 
         print("\n" + "=" * 50)
-        print("  泰拉瑞亚·Lumi 模式")
+        print("  泰拉瑞亚·fames 模式")
         print("=" * 50)
 
         # --- 初始化 ---
@@ -438,7 +438,7 @@ class TerrariaBridge:
         engine.equip_wings()
         runner.auto_equip()
 
-        # --- 注册 C# combat event 回调 → 转发给 Lumi ---
+        # --- 注册 C# combat event 回调 → 转发给 fames ---
         self._last_death_message = ""  # 保存最近的死亡描述（供场景分类用）
         self._is_dead = False          # 死亡状态标志
 
@@ -510,7 +510,7 @@ class TerrariaBridge:
         })
         recent_actions.append("游戏连接成功，等待目标")
 
-        print("\n=== 进入 Lumi 生存循环 ===")
+        print("\n=== 进入 fames 生存循环 ===")
 
         while self.running and conn.connected:
             conn.get_state()
@@ -680,7 +680,7 @@ class TerrariaBridge:
                             "text": f"决定{goal_label} {new_goal.target}（{new_goal.reason}）"
                         })
                         self._push_game_state()
-                        print(f"\n  [Lumi生存] 收到新目标: {new_goal.goal_type} → {new_goal.target}")
+                        print(f"\n  [fames生存] 收到新目标: {new_goal.goal_type} → {new_goal.target}")
                 except queue.Empty:
                     pass
 
@@ -697,13 +697,13 @@ class TerrariaBridge:
                     self._push_event("game_event", {
                         "text": f"搞定了！{current_goal.target} 完成"
                     })
-                    print(f"\n  [Lumi生存] 目标完成: {result_desc}")
+                    print(f"\n  [fames生存] 目标完成: {result_desc}")
                 else:
                     recent_actions.append(f"目标失败: {goal_desc} — {result_desc}")
                     self._push_event("game_event", {
                         "text": f"{current_goal.target} 没搞成（{result_desc}）"
                     })
-                    print(f"\n  [Lumi生存] 目标失败: {result_desc}")
+                    print(f"\n  [fames生存] 目标失败: {result_desc}")
 
                 current_goal = None
                 self._current_goal_text = "无"
@@ -723,7 +723,7 @@ class TerrariaBridge:
                     continue
                 else:
                     waiting_first_goal = False
-                    print("  [Lumi生存] 首个目标等待超时，进入 Fallback 模式")
+                    print("  [fames生存] 首个目标等待超时，进入 Fallback 模式")
 
             patrol_cycles += 1
 
@@ -752,7 +752,7 @@ class TerrariaBridge:
                             "text": "补给完毕，回来继续跟上"
                         })
                         # 回家后传送回宿主身边（用传送会回出生点，需要走回去）
-                        # 跟随逻辑会自动把 Lumi 拉回宿主身边
+                        # 跟随逻辑会自动把 fames 拉回宿主身边
                         continue
 
                 # --- 定期检查：装备升级 ---
@@ -872,7 +872,7 @@ class TerrariaBridge:
             conn.set_auto_mode(False)
         except Exception:
             pass
-        print("  [Lumi生存] 生存循环结束")
+        print("  [fames生存] 生存循环结束")
 
 
 # ==================== 独立测试入口 ====================

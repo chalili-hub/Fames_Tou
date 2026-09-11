@@ -1,4 +1,4 @@
-"""Lumi 全局状态机 — 系统当前状态的唯一真相源"""
+"""fames 全局状态机 — 系统当前状态的唯一真相源"""
 
 import enum
 import threading

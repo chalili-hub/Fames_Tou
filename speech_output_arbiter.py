@@ -17,6 +17,9 @@ from typing import Callable, Optional
 POLICY_QUEUE = "queue_after_current"
 POLICY_DROP = "drop_if_busy"
 POLICY_INTERRUPT = "interrupt_current"
+# 优先级抢占：带更高 ``priority`` 的请求可以不等当前发言结束，直接把发言权拿过来。
+# 用于付费互动（SC / 上舰 / 礼物）——它们不能因为两个角色正在闲聊就被漏掉。
+POLICY_PRIORITY = "priority_preempt"
 
 
 @dataclass
@@ -25,6 +28,7 @@ class SpeechOutput:
     speaker: str
     source: str
     policy: str
+    priority: int = 0
     started_at: float = field(default_factory=time.time)
     task_id: Optional[str] = None
     cancelled: bool = False
@@ -32,7 +36,8 @@ class SpeechOutput:
 
 
 class SpeechOutputArbiter:
-    def __init__(self, *, event_bus=None, log_fn: Callable[[str], None] | None = None):
+    def __init__(self, *, event_bus=None, log_fn: Callable[[str], None] | None = None,
+                 cooldown_s: float = 0.0):
         self._lock = threading.RLock()
         self._counter = 0
         self._current: SpeechOutput | None = None
@@ -41,6 +46,39 @@ class SpeechOutputArbiter:
         self._cancel_callback: Callable[[SpeechOutput, str], None] | None = None
         self._event_bus = event_bus
         self._log_fn = log_fn or (lambda _msg: None)
+        # 连麦冷却：同一个角色刚交还发言权后，在 cooldown_s 秒内不能立刻再次开口。
+        # 0 表示禁用（默认）。作用是防止双角色场景下话说得多的那个把场子全占了。
+        self._cooldown_s = max(0.0, float(cooldown_s))
+        self._last_release_at: dict[str, float] = {}
+
+    def set_cooldown(self, cooldown_s: float):
+        """调整连麦冷却时长（秒）。传 0 关闭冷却。"""
+        with self._lock:
+            self._cooldown_s = max(0.0, float(cooldown_s))
+
+    def cooldown_s(self) -> float:
+        with self._lock:
+            return self._cooldown_s
+
+    def cooldown_remaining(self, speaker: str, *, now: float | None = None) -> float:
+        """返回该角色还需要等多少秒才能重新开口（0 = 现在就可以）。"""
+        with self._lock:
+            return self._cooldown_remaining_locked(speaker, now=now)
+
+    def _cooldown_remaining_locked(self, speaker: str, *, now: float | None = None) -> float:
+        if self._cooldown_s <= 0 or not speaker:
+            return 0.0
+        last = self._last_release_at.get(speaker)
+        if last is None:
+            return 0.0
+        elapsed = (now if now is not None else time.time()) - last
+        remaining = self._cooldown_s - elapsed
+        return remaining if remaining > 0 else 0.0
+
+    def _note_release_locked(self, output: SpeechOutput | None):
+        """记录某个角色的发言权交还时刻，供冷却判定使用。"""
+        if output and output.speaker:
+            self._last_release_at[output.speaker] = time.time()
 
     def configure(self, *, event_bus=None, log_fn=None,
                   cancel_callback: Callable[[SpeechOutput, str], None] | None = None):
@@ -54,7 +92,9 @@ class SpeechOutputArbiter:
 
     def request_start(self, *, speaker: str, source: str,
                       policy: str = POLICY_QUEUE,
-                      reason: str = "") -> SpeechOutput | None:
+                      priority: int = 0,
+                      reason: str = "",
+                      ignore_cooldown: bool = False) -> SpeechOutput | None:
         with self._lock:
             if self._current and self.is_busy_locked():
                 if policy == POLICY_DROP:
@@ -63,10 +103,21 @@ class SpeechOutputArbiter:
                         "current_output_id": self._current.output_id,
                     })
                     return None
-                if policy == POLICY_QUEUE:
+                if policy == POLICY_PRIORITY and priority > self._current.priority:
+                    # 优先级更高 → 抢占：先广播抢占事件，再把发言权夺过来
+                    preempted = self._current
+                    self._publish("speech_output_preempted", {
+                        "speaker": speaker, "source": source, "priority": priority,
+                        "preempted_speaker": preempted.speaker,
+                        "preempted_output_id": preempted.output_id,
+                        "preempted_priority": preempted.priority,
+                    })
+                    self.cancel_current_locked(reason or f"preempted_by_{source}")
+                elif policy in (POLICY_QUEUE, POLICY_PRIORITY):
+                    # 普通排队；优先级策略但优先级不够时同样退化为排队，不打断
                     self._queue.put({
                         "speaker": speaker, "source": source,
-                        "policy": policy, "reason": reason,
+                        "policy": policy, "priority": priority, "reason": reason,
                     })
                     self._publish("speech_output_queued", {
                         "speaker": speaker, "source": source,
@@ -74,10 +125,22 @@ class SpeechOutputArbiter:
                         "queue_size": self._queue.qsize(),
                     })
                     return None
-                if policy == POLICY_INTERRUPT:
+                elif policy == POLICY_INTERRUPT:
                     self.cancel_current_locked(reason or f"interrupted_by_{source}")
 
-            output = self._new_output_locked(speaker=speaker, source=source, policy=policy)
+            # 连麦冷却：刚交还发言权的角色不能立刻再次开口，避免单个角色霸场
+            if not ignore_cooldown:
+                remaining = self._cooldown_remaining_locked(speaker)
+                if remaining > 0:
+                    self._publish("speech_output_cooldown_blocked", {
+                        "speaker": speaker, "source": source,
+                        "remaining_s": round(remaining, 3),
+                        "cooldown_s": self._cooldown_s,
+                    })
+                    return None
+
+            output = self._new_output_locked(speaker=speaker, source=source,
+                                             policy=policy, priority=priority)
             self._publish("speech_output_started", self._event_data(output))
             return output
 
@@ -95,6 +158,7 @@ class SpeechOutputArbiter:
             if self._current and self._current.output_id == output_id:
                 done = self._current
                 self._current = None
+                self._note_release_locked(done)
                 self._publish("speech_output_done", self._event_data(done))
             self._cancelled.discard(output_id)
 
@@ -113,6 +177,7 @@ class SpeechOutputArbiter:
             failed = current
             failed.reason = reason
             self._current = None
+            self._note_release_locked(failed)
             self._cancelled.discard(failed.output_id)
             self._publish("speech_output_failed", {
                 **self._event_data(failed),
@@ -132,6 +197,7 @@ class SpeechOutputArbiter:
         old.reason = reason
         self._cancelled.add(old.output_id)
         self._current = None
+        self._note_release_locked(old)
         self._publish("speech_output_cancelled", {
             **self._event_data(old),
             "reason": reason,
@@ -205,6 +271,7 @@ class SpeechOutputArbiter:
             if not self._current or self._current.output_id != output.output_id:
                 return None
             self._current = None
+            self._note_release_locked(output)
             self._cancelled.discard(output.output_id)
             self._publish("speech_output_done", {
                 **self._event_data(output),
@@ -216,13 +283,15 @@ class SpeechOutputArbiter:
     def queued_count(self) -> int:
         return self._queue.qsize()
 
-    def _new_output_locked(self, *, speaker: str, source: str, policy: str) -> SpeechOutput:
+    def _new_output_locked(self, *, speaker: str, source: str, policy: str,
+                           priority: int = 0) -> SpeechOutput:
         self._counter += 1
         output = SpeechOutput(
             output_id=f"speech_{int(time.time() * 1000)}_{self._counter}",
             speaker=speaker or "",
             source=source or "",
             policy=policy or POLICY_QUEUE,
+            priority=int(priority or 0),
         )
         self._current = output
         return output
@@ -233,6 +302,7 @@ class SpeechOutputArbiter:
             "speaker": output.speaker,
             "source": output.source,
             "policy": output.policy,
+            "priority": output.priority,
             "task_id": output.task_id,
             "started_at": output.started_at,
         }

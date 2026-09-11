@@ -18,6 +18,14 @@ stand-ins:
 Everything else — who-speaks-next, @-mention routing, the viewer-chat queue, and
 one-voice-at-a-time arbitration — is the real production code from this repo.
 
+The demo also exercises two additions made on top of the upstream design:
+
+  * ``speech_output_arbiter.POLICY_PRIORITY`` — a paid interaction (SC / guard /
+    gift) can preempt ordinary banter instead of waiting for the floor, and a
+    per-speaker **cooldown** stops one character from monopolising the stage.
+  * ``stream_analytics.StreamAnalytics`` — a pure event-bus consumer that reports
+    speaking distribution and floor-contention numbers at the end of the run.
+
 Run it:
 
     python main.py
@@ -27,7 +35,12 @@ import time
 from event_bus import EventBus
 from state_machine import StateMachine, State
 from speaker_scheduler import SpeakerScheduler
-from speech_output_arbiter import SpeechOutputArbiter, POLICY_QUEUE
+from speech_output_arbiter import (
+    SpeechOutputArbiter,
+    POLICY_QUEUE,
+    POLICY_PRIORITY,
+)
+from stream_analytics import StreamAnalytics
 from voice_config import get_speaker_config
 
 
@@ -80,19 +93,19 @@ def demo_speak(arbiter: SpeechOutputArbiter, speaker: str, text: str,
 # --- placeholder characters (NOT the real personas) -------------------------
 
 DEMO_LINES = {
-    "Lumi": {
+    "fames": {
         "banter": [
             "Welcome in, everyone! It's so cozy with all of you here.",
-            "Nox, smile a little - the chat can hear you sulking~",
+            "tou, smile a little - the chat can hear you sulking~",
             "Ooh, someone sent a gift! You're all far too kind to us.",
             "Okay okay, what should we play after this?",
         ],
         "to_viewer": "Ooh, {who} asks a good one - let me think!",
     },
-    "Nox": {
+    "tou": {
         "banter": [
             "Another stream. Joy. Hello, I suppose.",
-            "Lumi, your enthusiasm is a workplace hazard.",
+            "fames, your enthusiasm is a workplace hazard.",
             "Chat, your taste is questionable. But you showed up — respect.",
             "If we must do this, let's at least do it well.",
         ],
@@ -107,10 +120,17 @@ def log_bus_event(event):
         print(f"     [state] {event.data['old']} -> {event.data['new']}")
     elif event.event_type == "speech_output_queued":
         print(f"     [arbiter] {event.data['speaker']} queued - floor is busy")
+    elif event.event_type == "speech_output_preempted":
+        print(f"     [arbiter] {event.data['speaker']} preempted "
+              f"{event.data['preempted_speaker']} "
+              f"(priority {event.data['priority']} > {event.data['preempted_priority']})")
+    elif event.event_type == "speech_output_cooldown_blocked":
+        print(f"     [arbiter] {event.data['speaker']} blocked by cooldown "
+              f"({event.data['remaining_s']}s left)")
 
 
 def main():
-    active = ["Lumi", "Nox"]
+    active = ["fames", "tou"]
 
     # Everything below is the real production coordination layer.
     bus = EventBus()
@@ -118,8 +138,12 @@ def main():
     scheduler = SpeakerScheduler(active_speakers=active)
     arbiter = SpeechOutputArbiter(event_bus=bus)
 
-    for et in ("state_changed", "speech_output_queued"):
+    for et in ("state_changed", "speech_output_queued",
+               "speech_output_preempted", "speech_output_cooldown_blocked"):
         bus.subscribe(et, log_bus_event)
+
+    # A pure event-bus consumer: it only listens, nothing else has to know it exists.
+    analytics = StreamAnalytics(event_bus=bus, active_speakers=active)
 
     brains = {name: DemoBrain(name, DEMO_LINES[name]) for name in active}
     for name in active:
@@ -129,22 +153,24 @@ def main():
     # Boot the stream: IDLE -> OPENING -> CHATTING.
     state.transition_to(State.OPENING)
     state.transition_to(State.CHATTING)
-    scheduler.reset_rotation("Lumi")  # Lumi opens
+    scheduler.reset_rotation("fames")  # fames opens
 
     # A viewer message arrives. It does not interrupt; it goes into the queue and
-    # is picked up on the next turn. This one @-mentions Nox.
-    scheduler.enqueue_input("弹幕：mona：Nox tell us a cold joke",
+    # is picked up on the next turn. This one @-mentions tou.
+    scheduler.enqueue_input("弹幕：mona：tou tell us a cold joke",
                             source="danmaku", label="mona")
+    analytics.record_viewer_input("danmaku")
 
     print("\n=== co-hosted chat segment ===")
     print("(characters alternate by default; an @-mention overrides who answers)\n")
     partner_last = {name: "" for name in active}
 
     for turn in range(6):
-        # Midway, another viewer chimes in — this one @-mentions Lumi.
+        # Midway, another viewer chimes in — this one @-mentions fames.
         if turn == 3:
-            scheduler.enqueue_input("弹幕：rin：Lumi what are we playing next?",
+            scheduler.enqueue_input("弹幕：rin：fames what are we playing next?",
                                     source="danmaku", label="rin")
+            analytics.record_viewer_input("danmaku")
 
         viewer_msgs = scheduler.pop_all_inputs(max_items=8)
         last_text = viewer_msgs[-1]["text"] if viewer_msgs else None
@@ -170,17 +196,58 @@ def main():
 
     # Show the arbiter keeping the floor to one voice at a time.
     print("\n=== one voice at a time (arbitration) ===")
-    held = arbiter.request_start(speaker="Lumi", source="chat")
-    print(f"  Lumi takes the floor: {held.output_id}")
-    blocked = arbiter.request_start(speaker="Nox", source="chat", policy=POLICY_QUEUE)
-    print(f"  Nox requests the floor while Lumi holds it -> "
+    held = arbiter.request_start(speaker="fames", source="chat")
+    print(f"  fames takes the floor: {held.output_id}")
+    blocked = arbiter.request_start(speaker="tou", source="chat", policy=POLICY_QUEUE)
+    print(f"  tou requests the floor while fames holds it -> "
           f"{'blocked (queued)' if blocked is None else 'got floor (unexpected!)'}")
     arbiter.mark_done(held.output_id)
-    print("  Lumi finishes; the floor is free again.")
+    print("  fames finishes; the floor is free again.")
+
+    # --- new policy 1: a paid interaction preempts ordinary chatter -----------
+    print("\n=== paid interaction preempts the floor (POLICY_PRIORITY) ===")
+    chatting = arbiter.request_start(speaker="tou", source="chat")
+    print(f"  tou is mid-sentence: {chatting.output_id} (priority {chatting.priority})")
+    sc = arbiter.request_start(speaker="fames", source="super_chat",
+                               policy=POLICY_PRIORITY, priority=10)
+    if sc is None:
+        print("  SC for fames -> queued (unexpected: it should have preempted)")
+    else:
+        print(f"  SC for fames -> took the floor: {sc.output_id} "
+              f"(priority {sc.priority}); tou still current? "
+              f"{arbiter.is_current(chatting.output_id)}")
+    arbiter.mark_done(sc.output_id if sc else None)
+
+    # --- new policy 2: per-speaker cooldown (anti stage-hogging) --------------
+    print("\n=== speaker cooldown (anti stage-hogging) ===")
+    arbiter.set_cooldown(1.0)
+    time.sleep(1.05)   # let every earlier release expire, so the demo is clean
+    first = arbiter.request_start(speaker="fames", source="chat")
+    print(f"  fames speaks: {first.output_id}")
+    arbiter.mark_done(first.output_id)
+    again = arbiter.request_start(speaker="fames", source="chat")
+    print(f"  fames tries again immediately -> "
+          f"{'blocked (cooldown)' if again is None else 'got floor (unexpected!)'} "
+          f"[{arbiter.cooldown_remaining('fames'):.2f}s left]")
+    other = arbiter.request_start(speaker="tou", source="chat")
+    print(f"  tou (a different speaker) -> "
+          f"{'took the floor: ' + other.output_id if other else 'blocked (unexpected!)'}")
+    arbiter.mark_done(other.output_id if other else None)
+    # 直播里还需要一条逃生通道：被 @ 点名时必须能立刻回话，不受冷却限制。
+    forced = arbiter.request_start(speaker="fames", source="chat", ignore_cooldown=True)
+    print(f"  fames @-mentioned -> ignore_cooldown=True bypasses it -> "
+          f"{'ok' if forced else 'blocked (unexpected!)'}")
+    arbiter.mark_done(forced.output_id if forced else None)
+    arbiter.set_cooldown(0.0)
 
     # Close the stream.
     state.transition_to(State.ENDING)
     state.transition_to(State.IDLE)
+
+    # The analytics module listened to the bus the whole time; nothing in the
+    # coordination layer was written with reporting in mind.
+    analytics.detach()
+    print("\n" + analytics.report())
     print("\n=== demo complete ===")
 
 

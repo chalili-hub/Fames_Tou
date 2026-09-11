@@ -1,5 +1,5 @@
 """
-Wordle 游戏桥接模块 - 作为 Lumi 子模块运行
+Wordle 游戏桥接模块 - 作为 fames 子模块运行
 本地 HTTP+WebSocket 服务提供 Wordle 网页，信息熵算法提供候选，快脑选词+解说
 
 OBS 浏览器源加载 http://localhost:8770/wordle.html 即可显示游戏画面。
@@ -101,13 +101,13 @@ WORDLE_GAME_PROMPT = """
 
 @dataclass
 class GameDecisionRequest:
-    """由 bridge 线程创建，投递给 Lumi 快脑，等待结果"""
+    """由 bridge 线程创建，投递给 fames 快脑，等待结果"""
     state_text: str                     # 当前局面描述（给操作者看，含已选/候选词）
     intel_text: str                     # 额外信息（可空）
     tools: list                         # Function Calling 工具定义
     spectator_text: str = ""            # 给旁观者看的局面（不剧透操作者要选的词）
     result_event: threading.Event = field(default_factory=threading.Event)
-    result: dict = field(default_factory=dict)  # Lumi 快脑写入决策结果
+    result: dict = field(default_factory=dict)  # fames 快脑写入决策结果
     cancelled: bool = False
     output_id: str | None = None        # 本手操作者这次说话的 output_id，用于精确等它播完
 
@@ -145,7 +145,7 @@ def build_wordle_tools(valid_words: list[str]) -> list[dict]:
 
 class WordleBridge:
     EXPECTED_GLOBAL_STATE = "PLAYING_WORDLE"
-    """Wordle 桥接器 — 可作为 Lumi 子线程或独立运行"""
+    """Wordle 桥接器 — 可作为 fames 子线程或独立运行"""
 
     SERVE_PORT = 8786  # Wordle 游戏服务端口，OBS 浏览器源加载此地址
 
@@ -402,7 +402,7 @@ class WordleBridge:
             self._rpc_fire('submitGuess', word)
 
     def get_pending_decision(self) -> GameDecisionRequest | None:
-        """供 Lumi 主线程检查是否有待处理的游戏决策"""
+        """供 fames 主线程检查是否有待处理的游戏决策"""
         with self._pending_lock:
             return self.pending_decision
 
@@ -450,7 +450,7 @@ class WordleBridge:
         """给旁观者看的局面——只描述已出现的结果，绝不剧透操作者本手要选的词。
 
         旁观者会「先于操作者」接一句，如果把含「你选择了 X」的决策文本丢给她，她会抢着
-        把操作者的选词念出来（实测 Lumi 在 Nox 出招前就说『Nox 选了 CARTE』穿帮）。
+        把操作者的选词念出来（实测 fames 在 tou 出招前就说『tou 选了 CARTE』穿帮）。
         """
         if turn <= 1 or not self.current_guesses:
             return (
@@ -763,7 +763,7 @@ class WordleBridge:
 # ==================== 独立运行入口（调试用）====================
 
 def main():
-    """独立运行：不连接 Lumi，快脑决策用算法首选替代"""
+    """独立运行：不连接 fames，快脑决策用算法首选替代"""
     bridge = WordleBridge()
     try:
         bridge.run()

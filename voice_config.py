@@ -7,13 +7,12 @@ source of truth that the speaker scheduler and routing layers read by the
 current speaker.
 
 When streaming with a single character, ``active_speakers`` holds one entry;
-in dual-character mode it holds two, e.g. ["Lumi", "Nox"].
+in dual-character mode it holds two, e.g. ["fames", "tou"].
 
-NOTE: The example characters below ("Lumi" / "Nox") ship with PLACEHOLDER
-values only. The real voice ids, Live2D models, persona prompt files and
-behavioral wording are part of the closed "soul" of the project and are NOT
-included in this open-source repository. Replace the placeholders with your
-own characters' values.
+The two characters of this project are ``fames`` and ``tou``. Their voice ids,
+Live2D models and persona prompt files are project-local assets and are NOT
+committed here — fill in your own values below, or keep the placeholders and
+the TTS layer will fall back to a system voice.
 """
 from dataclasses import dataclass, field
 
@@ -27,7 +26,7 @@ VTS_BASE_PORT = 8001
 
 @dataclass
 class SpeakerConfig:
-    name: str                                # e.g. "Lumi" / "Nox"
+    name: str                                # e.g. "fames" / "tou"
     voice_name: str                          # voice-library key, resolved to a real voice id by the TTS layer
     realtime_voice_id: str                   # speaker_id for the end-to-end realtime voice model
     vts_model_name: str                      # Live2D model name registered in VTube Studio
@@ -53,26 +52,26 @@ class SpeakerConfig:
 
 
 SPEAKER_CONFIGS: dict[str, SpeakerConfig] = {
-    "Lumi": SpeakerConfig(
-        name="Lumi",
+    "fames": SpeakerConfig(
+        name="fames",
         voice_name="character_a_voice",
         realtime_voice_id="REPLACE_WITH_YOUR_VOICE_ID",
-        vts_model_name="Character A Model",
-        subtitle_color="#FFC0CB",
-        subtitle_label="Lumi",
-        prompt_file="persona/character_a.md",
-        realtime_character_manifest_file="persona/character_a_realtime.md",
+        vts_model_name="Fames Model",
+        subtitle_color="#8AB4F8",
+        subtitle_label="fames",
+        prompt_file="persona/fames.md",
+        realtime_character_manifest_file="persona/fames_realtime.md",
         audio_cable_keyword="CABLE Input",
     ),
-    "Nox": SpeakerConfig(
-        name="Nox",
+    "tou": SpeakerConfig(
+        name="tou",
         voice_name="character_b_voice",
         realtime_voice_id="REPLACE_WITH_YOUR_VOICE_ID",
-        vts_model_name="Character B Model",
-        subtitle_color="#FFA500",
-        subtitle_label="Nox",
-        prompt_file="persona/character_b.md",
-        realtime_character_manifest_file="persona/character_b_realtime.md",
+        vts_model_name="Tou Model",
+        subtitle_color="#F28B82",
+        subtitle_label="tou",
+        prompt_file="persona/tou.md",
+        realtime_character_manifest_file="persona/tou_realtime.md",
         audio_cable_keyword="Hi-Fi Cable Input",
     ),
 }

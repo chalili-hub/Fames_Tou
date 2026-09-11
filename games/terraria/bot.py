@@ -1,6 +1,6 @@
 """
 Terraria Bot - TCP client for LumiBridge mod.
-Controls Lumi's character in Terraria via tModLoader.
+Controls fames's character in Terraria via tModLoader.
 
 Usage:
     python -m games.terraria.bot          # Auto-launch tModLoader + test movement
@@ -62,8 +62,8 @@ MOD_SOURCE_PATH = os.getenv(
     str(Path(__file__).resolve().parent / "mod" / "LumiBridge"),
 )
 EXPECTED_MOD_VERSION = "5.3"
-PLAYER_NAME = "Lumi"
-WORLD_NAME = "Lumi的世界"
+PLAYER_NAME = "fames"
+WORLD_NAME = "fames的世界"
 
 
 def find_and_activate_window(title_keyword: str) -> bool:
@@ -4363,7 +4363,7 @@ class StrategicBrain:
         self._summary = ""  # latest summary from tactical layer
         self._thread = threading.Thread(target=self._run, daemon=True, name="StrategicBrain")
 
-        # API config — same as Lumi slow brain (Volcengine ARK)
+        # API config — same as fames slow brain (Volcengine ARK)
         self._api_url = "https://ark.cn-beijing.volces.com/api/v3/chat/completions"
         self._api_key = os.getenv("ARK_API_KEY", "")
         self._model = "doubao-seed-1-8-251228"
@@ -6096,7 +6096,7 @@ def main():
     args = parser.parse_args()
 
     print("=" * 50)
-    print("  Terraria Bot - Lumi AI 泰拉瑞亚控制器")
+    print("  Terraria Bot - fames AI 泰拉瑞亚控制器")
     print("  Ctrl+C 退出")
     print("=" * 50)
 

@@ -349,7 +349,7 @@ class KingdomRushAI:
         self._level_exit = None   # 关卡终点坐标 (x,y)，bridge v5.13 下发
         self._result = None  # 对战结果: "win"/"lose"/"timeout"/"abort"
         self._record_persisted = False  # 本局结果是否已写入历史（防重复）
-        self._event_callback = event_callback  # Lumi 事件推送回调
+        self._event_callback = event_callback  # fames 事件推送回调
         self._life_lost_events = []  # 累积扣命事件（来自 Bridge）
         self._opening_plan = None   # LLM 选定的开局方案
         self._battle_history = battle_history or {}  # 对战历史引用
@@ -357,7 +357,7 @@ class KingdomRushAI:
         self._star_goal = star_goal  # 刷星目标（None=首次推图，3=刷三星）
 
     def _push_event(self, text, event=""):
-        """推送事件给 Lumi Bridge"""
+        """推送事件给 fames Bridge"""
         if self._event_callback:
             self._event_callback("game_event", {"text": text, "event": event})
 
@@ -2506,7 +2506,7 @@ class KingdomRushAI:
                             parts.append(resist_hint)
                         self._push_event(" ".join(parts), "wave_preview")
 
-                # 每5个tick推送状态快照给 Lumi
+                # 每5个tick推送状态快照给 fames
                 if self.tick_count % 5 == 0 and self._event_callback:
                     towers_info = format_tower_summary(towers)
                     self._event_callback("game_state", {

@@ -61,10 +61,10 @@ def mirror_speech_to_partner(active_speakers: list,
     """把 speaker 刚才说的话以 [speaker说] xxx 形式镜像到其他角色的 history。
 
     单角色场景（active_speakers 只 1 项）：no-op。
-    双角色场景：把 [Lumi说] xxx 加到 Nox 的 user history（反之亦然）。
+    双角色场景：把 [fames说] xxx 加到 tou 的 user history（反之亦然）。
     多角色（>2，未来扩展）：广播到除自己之外的所有角色。
 
-    与提示词约定一致（Lumi V4 / Nox V1 都说"对方发言以 [对方说] 形式出现"）。
+    与提示词约定一致（fames V4 / tou V1 都说"对方发言以 [对方说] 形式出现"）。
     """
     if len(active_speakers) <= 1:
         return
@@ -89,7 +89,7 @@ def build_realtime_mirror_qa(partner_name: str,
     过的提示模式），assistant 字段填占位承接话。模型把它理解成"导演告诉我搭档
     刚才和用户的对话内容"，不会和自己人设混淆。
 
-    与提示词协作段落配套（各角色的人设提示词 / Nox 同款里要求识别
+    与提示词协作段落配套（各角色的人设提示词 / tou 同款里要求识别
     [直播提示] 前缀作为旁白信号）。
     """
     user_text = (
@@ -443,11 +443,11 @@ class ConversationContext:
     terraria_build_anchor_msg: Callable
 
     # ─── Step 2 双角色字段（带默认值，单角色场景下为占位） ──────────────
-    active_speakers: list = field(default_factory=lambda: ["Lumi"])
-    fast_brains: dict = field(default_factory=dict)        # {"Lumi": FastBrain, "Nox": FastBrain}
+    active_speakers: list = field(default_factory=lambda: ["fames"])
+    fast_brains: dict = field(default_factory=dict)        # {"fames": FastBrain, "tou": FastBrain}
     scheduler: Any = None                                  # SpeakerScheduler 实例
-    speaker_configs: dict = field(default_factory=dict)    # {"Lumi": SpeakerConfig, "Nox": SpeakerConfig}
-    cable_indices: dict = field(default_factory=dict)      # {"Lumi": cable_idx, "Nox": cable_idx} TTS 输出声卡 index
+    speaker_configs: dict = field(default_factory=dict)    # {"fames": SpeakerConfig, "tou": SpeakerConfig}
+    cable_indices: dict = field(default_factory=dict)      # {"fames": cable_idx, "tou": cable_idx} TTS 输出声卡 index
     memory_runtime: Any = None
     get_session_id: Callable[[], str] = field(default_factory=lambda: lambda: None)
     # 游戏操控权回调（lazy-bound，从 director 实时读当前 game segment 的 controller）
@@ -1073,7 +1073,7 @@ def chat_and_speak(
 
 
 def proactive_speak(ctx: ConversationContext, vad_model=None, cable_index=None, director_msg: str = None):
-    """Lumi/Nox 主动说话（用户沉默时触发）或处理待决游戏请求。
+    """fames/tou 主动说话（用户沉默时触发）或处理待决游戏请求。
 
     AI 角色由 ctx.scheduler.pick_speaker(None) 决定（next_speaker 轮换）；
     单角色场景下永远是同一个角色，双角色场景下两个角色交替主动说话。
@@ -1175,7 +1175,7 @@ def proactive_speak(ctx: ConversationContext, vad_model=None, cable_index=None, 
         # 让角色模型把它当"立刻照做"的指令，而不是又起一段闲聊（角色模型对埋藏的弱
         # 元指令不敏感，必须强位置 + 明确框架）。指令正文走 silence_msg 放到最后一条。
         # 可观测性：这条只有走新"定向轮次"路径才会打印；ai_speaker 是调度器 pick_speaker
-        # 轮换选出来的（多次下播/切环节能看出 Lumi/Nox 轮着接，而非永远 Lumi）。
+        # 轮换选出来的（多次下播/切环节能看出 fames/tou 轮着接，而非永远 fames）。
         ctx.log_event(
             f"{C_FAST}[导演·定向轮次] 调度器轮换选中 {ai_speaker} 接导演指令"
             f"（强位置投递、非闲聊框架）：{director_msg[:30]}{C_RESET}"
@@ -1361,7 +1361,7 @@ def proactive_speak(ctx: ConversationContext, vad_model=None, cable_index=None, 
             game_request.result_event.set()
             ctx.log_event(f"{C_FAST}[快脑·游戏决策·提前触发] {decision}{C_RESET}")
 
-    # 击败/获胜时放开 token 上限，让 Lumi 有空间演绎
+    # 击败/获胜时放开 token 上限，让 fames 有空间演绎
     with ctx.slot_lock:
         _bs_situation = ctx.context_slot.get("_buckshot_situation", "")
     if _bs_situation in ("defeated", "victory"):

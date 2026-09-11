@@ -54,6 +54,10 @@ python main.py
   **独立 worker 进程**中的熵值求解器，重计算不会卡住主循环。
 - **快脑**（`fast_brain.py`）
   每个角色一个轻量 LLM，负责工具调用与游戏决策，与实时语音链路并行工作。
+- **直播复盘**（`stream_analytics.py`）
+  纯事件总线订阅者：统计每个角色的发言次数/累计时长/占比、抢麦冲突
+  （排队·丢弃·打断·优先级抢占·冷却拦截）、观众消息吞吐与状态时间线，
+  下播后直接产出复盘报告——协调层不需要为"被统计"改一行代码。
 - **协调骨架**（`event_bus.py`、`state_machine.py`）
   所有模块通过进程内事件总线通信，并锚定在唯一的全局状态机上。
 
@@ -70,6 +74,7 @@ speech_output_arbiter.py # 同一时刻只有一个声音持有发言权
 conversation.py          # 文本链路编排与历史镜像
 realtime_chat*.py        # 双端到端实时语音会话
 lumi_asr.py / lumi_tts.py / cosyvoice_tts.py / tts_emitter.py   # 语音输入输出
+stream_analytics.py      # 直播复盘：发言分布与抢麦冲突统计
 memory/                  # SQLite 记忆、抽取、衰减与确定性事实
 games/                   # 每个游戏一个目录；文字游戏共用独立 solver worker
 docs/                    # 架构文档与游戏工程笔记
@@ -115,7 +120,27 @@ python -m unittest discover -s tests -v
 python -m compileall -q .
 ```
 
+## 本项目的改动
+
+本项目基于开源项目 **Lumi_Nox** 二次开发，在其架构之上做了以下改动：
+
+1. **角色替换**：把上游的示例角色替换为本项目的两个角色 `fames` 与 `tou`，
+   配置、提示词、控制台输出与游戏侧默认名全部对齐。
+2. **新增直播可观测性模块**（`stream_analytics.py`）：一个纯事件总线订阅者，
+   统计每个角色的发言次数 / 累计时长 / 占比，抢麦冲突（排队 · 丢弃 · 打断 ·
+   优先级抢占 · 冷却拦截），观众消息吞吐与状态时间线，下播后直接产出复盘报告。
+   协调层不需要为"被统计"改任何代码——这是事件驱动架构的直接红利。
+3. **新增两种抢麦策略**（`speech_output_arbiter.py`）：
+   - `POLICY_PRIORITY` 优先级抢占：付费互动（SC / 上舰 / 礼物）可以不等当前发言结束，
+     直接把发言权拿过来，不会因为两个角色正在闲聊而被漏掉；
+   - **连麦冷却**：同一角色交还发言权后的一段时间内不能立刻再开口，防止单个角色霸场；
+     同时保留 `ignore_cooldown` 逃生通道，供"被点名必须回话"的场景使用。
+4. **补充测试**：新增 `tests/test_arbiter_policies.py` 与 `tests/test_stream_analytics.py`
+   覆盖上述新策略与统计模块，并修掉演示测试在 GBK 环境下解码 UTF-8 输出的脆弱点。
+
 ## 许可证与出处
 
-依据 MIT 协议，使用、修改、分发本项目时
-需保留上述版权声明与许可全文。
+上游项目：[**Lumi_Nox**](https://github.com/MIO-456/Lumi_Nox)（作者 **Mio**，MIT 协议）。
+
+本项目的架构与实现沿用其成果，相关版权归原作者所有。
+依据 MIT 协议，使用、修改、分发本项目时需保留版权声明与许可全文，全文见 [LICENSE](LICENSE)。

@@ -77,8 +77,8 @@ def init(*, log_fn: Callable, pa_instance, event_bus,
     ACCESS_KEY = access_key
     _sessions = {}
     _speaker_output_devices = {}
-    _default_speaker = "Lumi"
-    _active_speaker = "Lumi"
+    _default_speaker = "fames"
+    _active_speaker = "fames"
     _user_audio_active = False
     _cancelled_task_ids = set()
     _cancelled_reply_ids = set()
@@ -246,8 +246,8 @@ _ws_loop: Optional[asyncio.AbstractEventLoop] = None
 _ws_alive: bool = False  # ws 当前是否真正可用（连上 + 服务端没主动断）
 _session_id: str = ""
 _sessions: dict[str, SessionRuntime] = {}
-_default_speaker: str = "Lumi"
-_active_speaker: str = "Lumi"
+_default_speaker: str = "fames"
+_active_speaker: str = "fames"
 _speaker_output_devices: dict[str, int] = {}
 _runtime_lock = RLock()
 
@@ -304,16 +304,16 @@ def _store_runtime_globals(speaker: str):
     值反向覆盖，会触发严重 race condition：
 
     bug 重现路径（dtd_test 没有这套 swap，所以 OK；主代码有，所以坏）：
-      1. start_session(Lumi) → rt[Lumi].ws = Lumi_ws ✓ 全局 _ws = Lumi_ws
-      2. start_session(Nox) → rt[Nox].ws = Nox_ws ✓ 全局 _ws = Nox_ws（覆盖）
-      3. Lumi 收事件 → _runtime_context(Lumi) enter: load → 全局 _ws = rt[Lumi].ws
+      1. start_session(fames) → rt[fames].ws = fames_ws ✓ 全局 _ws = fames_ws
+      2. start_session(tou) → rt[tou].ws = tou_ws ✓ 全局 _ws = tou_ws（覆盖）
+      3. fames 收事件 → _runtime_context(fames) enter: load → 全局 _ws = rt[fames].ws
          事件处理（有跨线程动作）
-         exit: store → rt[Lumi].ws = 全局 _ws —— 如果这一刻 Nox 的 ws 初始化
-         coroutine 在另一线程把全局 _ws 改成 Nox_ws，rt[Lumi].ws 被错误覆盖成 Nox_ws
-      4. mic_pump 推帧给 Lumi (active=Lumi) → _send_frame_threadsafe → rt[Lumi].ws
-         → 实际拿到 Nox_ws → 帧被推到 Nox session
-      5. 用户语音被 Nox session 处理 → reply 来自 Nox（payload speaker=Nox）
-         但 active 是 Lumi → 调度器混乱 / 两条 session 都在响应
+         exit: store → rt[fames].ws = 全局 _ws —— 如果这一刻 tou 的 ws 初始化
+         coroutine 在另一线程把全局 _ws 改成 tou_ws，rt[fames].ws 被错误覆盖成 tou_ws
+      4. mic_pump 推帧给 fames (active=fames) → _send_frame_threadsafe → rt[fames].ws
+         → 实际拿到 tou_ws → 帧被推到 tou session
+      5. 用户语音被 tou session 处理 → reply 来自 tou（payload speaker=tou）
+         但 active 是 fames → 调度器混乱 / 两条 session 都在响应
 
     历史教训 + 累积修复（2026-05-09 → 05-10）：
       097e391: 摘除 last_speech_done_at（process 级状态）
@@ -978,7 +978,7 @@ def _discard_all_inflight_tasks(reason: str = "") -> int:
             _log_fn(f"{C_RT}[realtime_chat] cancelled inflight responses total={total} reason={reason}{C_RESET}")
         return total
 
-# 端到端"Lumi 估算说完时刻"——给主循环 PROACTIVE 沉默兜底用
+# 端到端"fames 估算说完时刻"——给主循环 PROACTIVE 沉默兜底用
 # inject/say 时先按上限保守设到未来，避免响应期间被打断；
 # 收到 ChatResponseEnd (559) 后按 reply 文本长度精算（中文 TTS ≈ 4 字/秒）重置；
 # SessionFinished/error 时显式标为 now，立刻解除占用。
@@ -999,7 +999,7 @@ def get_last_speech_done_at(speaker: str = None) -> float:
     per-session 快照——但 `_set/extend_speech_done_at` 只改全局，per-session
     字段只在 `_runtime_context` 进出时同步一次，导致从主循环读到的是初始值 0，
     elapsed 始终是 now（巨大），双角色场景下立刻误判"沉默 4 秒触发 PROACTIVE"
-    + "已说完 0.5 秒立刻切麦"，造成 Lumi 还在播音 Nox 就被 inject 接龙、
+    + "已说完 0.5 秒立刻切麦"，造成 fames 还在播音 tou 就被 inject 接龙、
     两条 audio 同时写 monitor 扬声器的级联故障（2026-05-10 实测）。
     """
     with _speech_done_lock:
@@ -1262,8 +1262,8 @@ def inject_text(text: str, speaker: str = None) -> str:
     把 inject 的文本同步设为该 session 的 _last_user_query —— 让本次 inject 触发的
     reply 事件能在 user_query 字段里带上 inject 原文（弹幕原文 / PROACTIVE 提示词
     / 导演笔记等）。否则 _last_user_query 只在 ASREnded 时更新，纯弹幕互动场景下
-    一直是空 → _on_realtime_reply 跨角色 sync_history 拿不到 user_query → Nox
-    看不见 Lumi 回弹幕的内容（实测 2026-05-10 11:59 日志全程无 sync ack）。
+    一直是空 → _on_realtime_reply 跨角色 sync_history 拿不到 user_query → tou
+    看不见 fames 回弹幕的内容（实测 2026-05-10 11:59 日志全程无 sync ack）。
     """
     with _runtime_context(speaker) as sp:
         global _last_user_query
@@ -1298,12 +1298,12 @@ def sync_history(speaker: str, qa_pair: list[dict]) -> str:
 
     **不进 _runtime_context** —— 嵌套 _runtime_context 会污染外层。
 
-    bug 重现：ws 接收线程收 Lumi 的 559 → 外层 _runtime_context(Lumi) →
-    publish reply 事件（同步）→ _on_realtime_reply 调 sync_history(Nox)
-    → 内层 _runtime_context(Nox) enter 加载 Nox 状态（含 _response_started_at=0）
-    → 内层 exit store rt[Nox]（Nox 状态保持）→ **全局没自动恢复成 Lumi 状态** →
-    外层 exit 时 store → rt[Lumi].response_started_at = 0（被 Nox 状态覆盖错位）
-    → 后续 Lumi 的 359 处理 elapsed=0 倒计时虚高（实测 2026-05-10 14:52
+    bug 重现：ws 接收线程收 fames 的 559 → 外层 _runtime_context(fames) →
+    publish reply 事件（同步）→ _on_realtime_reply 调 sync_history(tou)
+    → 内层 _runtime_context(tou) enter 加载 tou 状态（含 _response_started_at=0）
+    → 内层 exit store rt[tou]（tou 状态保持）→ **全局没自动恢复成 fames 状态** →
+    外层 exit 时 store → rt[fames].response_started_at = 0（被 tou 状态覆盖错位）
+    → 后续 fames 的 359 处理 elapsed=0 倒计时虚高（实测 2026-05-10 14:52
     诊断日志确认）。
 
     sync_history 只需要 session_id 和 ws 发帧能力 —— 这些都是 per-session
@@ -1390,7 +1390,7 @@ def _dispatch_event(resp: dict, speaker: str = None):
         return
 
     # ASRInfo：服务端在识别到用户开口的第一个字时发出。
-    # 含义是"客户端立刻停止播放当前 TTS 音频"——把还在客户端缓冲的音频帧丢弃，避免开口后还能听到 Lumi 上一段的尾巴。
+    # 含义是"客户端立刻停止播放当前 TTS 音频"——把还在客户端缓冲的音频帧丢弃，避免开口后还能听到 fames 上一段的尾巴。
     # 注意：这里只清音频播放层，不要触发 tts_state.interrupted。speak 链路的"用户讲话了"信号走 459 → user_speech_done → speak 自然退出。
     if event == 450:
         _user_audio_active = True
@@ -1458,7 +1458,7 @@ def _dispatch_event(resp: dict, speaker: str = None):
         # 只有真识别到 ASR 文本时才锁 60 秒等模型回复。空 text（噪声打断 / 用户
         # 短暂咳嗽 / 半句被中断）端到端服务端不会生成 reply —— 没有 559/359 来
         # 精算覆盖 _last_speech_done_at，会让 PROACTIVE 兜底卡 60 秒不触发，
-        # 用户体感"Lumi/Nox 触发字幕打断之后突然不再主动说话了"（实测 2026-05-10）。
+        # 用户体感"fames/tou 触发字幕打断之后突然不再主动说话了"（实测 2026-05-10）。
         if text:
             _extend_speech_done_at(time.time() + 60.0)
         else:
@@ -1909,7 +1909,7 @@ def start_audio_output():
                 continue
             rt.output_stream = _open_output_stream(cable_index)
             # 双角色场景下每条 session 都开 monitor_stream 写到外放扬声器，
-            # 否则非 default speaker（如 Nox）的音频只到虚拟声卡 → OBS 推流，
+            # 否则非 default speaker（如 tou）的音频只到虚拟声卡 → OBS 推流，
             # 本地耳听就听不到。两条音频按当前架构是轮流播（不会同时），
             # PyAudio 多个 output stream 写同一设备索引在轮播下不会冲突。
             if _monitor_device_index is not None:

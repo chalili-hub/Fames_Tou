@@ -19,7 +19,7 @@ from typing import Optional
 
 @dataclass
 class SpeakerScheduler:
-    active_speakers: list                       # ["Lumi"] / ["Nox"] / ["Lumi", "Nox"]
+    active_speakers: list                       # ["fames"] / ["tou"] / ["fames", "tou"]
     _next_idx: int = 0
     _input_queue: deque = field(default_factory=deque)
     _queue_lock: threading.Lock = field(default_factory=threading.Lock)
@@ -161,7 +161,7 @@ class SpeakerScheduler:
 
     def reset_rotation(self, start_speaker: Optional[str] = None):
         """重置轮换游标。start_speaker 为 None 时默认从 active_speakers[0] 开始。
-        用于直播开始时确保从指定角色（默认 Lumi）开口。"""
+        用于直播开始时确保从指定角色（默认 fames）开口。"""
         if start_speaker is None:
             self._next_idx = 0
             return

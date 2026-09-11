@@ -1,3 +1,4 @@
+import os
 import subprocess
 import sys
 from datetime import datetime
@@ -39,12 +40,18 @@ class FakeStorage:
 
 class PublicCoreTests(unittest.TestCase):
     def test_zero_setup_demo(self):
+        # 演示输出含中文（复盘报告），而 runner 的默认解码依赖系统区域设置。
+        # 显式把子进程与父进程都固定成 UTF-8，避免 GBK 环境下读取线程解码失败。
+        env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
         result = subprocess.run(
             [sys.executable, "main.py"], cwd=ROOT,
-            capture_output=True, text=True, timeout=15,
+            capture_output=True, text=True, timeout=30,
+            encoding="utf-8", errors="replace", env=env,
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("demo complete", result.stdout)
+        # 可观测性模块应当在演示结束时产出复盘报告
+        self.assertIn("直播复盘报告", result.stdout)
 
     def test_decay_filters_stale_fact(self):
         strength = fact_strength(

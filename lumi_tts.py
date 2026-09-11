@@ -1,4 +1,4 @@
-"""Lumi TTS 模块 — 语音合成、播放、字幕显示
+"""fames TTS 模块 — 语音合成、播放、字幕显示
 
 从 lumi.py 拆分出来。通过 init() 注入所有外部依赖，无反向 import。
 """
@@ -179,7 +179,7 @@ subtitle_queue: queue.Queue = queue.Queue()
 
 
 def run_subtitle_window():
-    """置顶透明字幕窗口，贴在大屏幕底部，流式显示 Lumi 说话内容"""
+    """置顶透明字幕窗口，贴在大屏幕底部，流式显示 fames 说话内容"""
     import tkinter as tk
     import tkinter.font as tkfont
     import mss
@@ -218,7 +218,7 @@ def run_subtitle_window():
         OUTLINE_COLOR = "#15110F"
 
         root = tk.Tk()
-        root.title("Lumi Subtitle")
+        root.title("fames Subtitle")
         root.overrideredirect(True)
         root.attributes("-topmost", True)
         root.attributes("-transparentcolor", BG)
@@ -490,7 +490,7 @@ def abort_subtitle_segments():
     worker 在每段开始处理之前主动 clear abort 事件，新段不会被旧的中止信号带歪。
 
     使用场景：
-    - 聊天环节用户开口打断 Lumi 当前回复（459 user_speech_done + Lumi 还在说话）
+    - 聊天环节用户开口打断 fames 当前回复（459 user_speech_done + fames 还在说话）
     - 游戏环节 VAD 监听到打断，speak() 提前退出
     """
     drained = 0
@@ -900,7 +900,7 @@ def speak(messages, vad_model=None, cable_index=None,
         for ch in text:
             # 括号内容一律剥掉：不念出来、也不累积进 _full_text（不进对话历史）。
             # 除圆括号外，把【】[] 也纳入——模型偶发用【动作】/[动作] 描写动作，一旦进历史
-            # 会被下一轮自回归学样、一发不可收（实测 Lumi 用【】包裹动作后全程污染）。
+            # 会被下一轮自回归学样、一发不可收（实测 fames 用【】包裹动作后全程污染）。
             if ch in '（(【[':
                 _tts_bracket = True
                 _tts_bracket_buf = ch

@@ -1,4 +1,4 @@
-"""Lumi 事件总线 — 模块间通信的唯一通道"""
+"""fames 事件总线 — 模块间通信的唯一通道"""
 
 import threading
 import uuid

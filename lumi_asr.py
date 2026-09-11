@@ -1,7 +1,7 @@
-"""Lumi 流式 ASR 模块（fun-asr-realtime 云端，连接轮换架构）。
+"""fames 流式 ASR 模块（fun-asr-realtime 云端，连接轮换架构）。
 
 每轮对话独占一条云端 WebSocket，消灭常驻连接下的跨轮上下文累积（串轮）。
-下一轮的连接在当前 Lumi 说话期间就建好并用 WebSocket 心跳保活，
+下一轮的连接在当前 fames 说话期间就建好并用 WebSocket 心跳保活，
 Mio 真正开始说话那一瞬间用的是"热"连接，建连延迟被完全隐藏。
 
 对外接口（三组）：

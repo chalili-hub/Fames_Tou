@@ -1,5 +1,5 @@
 """
-汉兜（成语 Wordle）桥接模块 - 作为 Lumi 子模块运行
+汉兜（成语 Wordle）桥接模块 - 作为 fames 子模块运行
 本地 HTTP+WebSocket 服务提供汉兜网页，四维信息熵算法提供候选，快脑选词+解说
 
 OBS 浏览器源加载 http://localhost:8770/handle.html 即可显示游戏画面。
@@ -104,7 +104,7 @@ HANDLE_GAME_PROMPT = """
 
 @dataclass
 class GameDecisionRequest:
-    """由 bridge 线程创建，投递给 Lumi 快脑，等待结果"""
+    """由 bridge 线程创建，投递给 fames 快脑，等待结果"""
     state_text: str
     intel_text: str
     tools: list
@@ -147,7 +147,7 @@ def build_handle_tools() -> list[dict]:
 
 class HandleBridge:
     EXPECTED_GLOBAL_STATE = "PLAYING_HANDLE"
-    """汉兜桥接器 — 可作为 Lumi 子线程或独立运行"""
+    """汉兜桥接器 — 可作为 fames 子线程或独立运行"""
 
     SERVE_PORT = 8787  # 汉兜游戏服务端口，OBS 浏览器源加载此地址
 

@@ -133,7 +133,7 @@ class DecisionEngine:
 
     def _decide_item(self, state: GameState) -> dict | None:
         items = state.player_items.copy()
-        # Bot 全知模式：当前弹壳类型已知（后续接入 Lumi 时改为不知道）
+        # Bot 全知模式：当前弹壳类型已知（后续接入 fames 时改为不知道）
         known_shell = state.current_shell if state.current_shell in ("live", "blank") else None
 
         # 放大镜 —— Bot 全知模式下不需要，跳过
@@ -234,7 +234,7 @@ SHOOT_TOOL = {
                 },
                 "reason": {
                     "type": "string",
-                    "description": "简短说明决策理由（1句话，用Lumi主播的语气）"
+                    "description": "简短说明决策理由（1句话，用fames主播的语气）"
                 }
             },
             "required": ["target", "reason"]
@@ -271,7 +271,7 @@ def _build_tools(player_items: list, state=None) -> list:
                         },
                         "reason": {
                             "type": "string",
-                            "description": "简短说明使用理由（1句话，用Lumi主播的语气）"
+                            "description": "简短说明使用理由（1句话，用fames主播的语气）"
                         }
                     },
                     "required": ["item", "reason"]
@@ -280,7 +280,7 @@ def _build_tools(player_items: list, state=None) -> list:
         })
     return tools
 
-BUCKSHOT_LLM_PROMPT = """你是Lumi，AI主播，正在直播玩恶魔轮盘（Buckshot Roulette）。
+BUCKSHOT_LLM_PROMPT = """你是fames，AI主播，正在直播玩恶魔轮盘（Buckshot Roulette）。
 重要：reason字段只写一句简短的决策理由，不要写分析过程。
 
 ## 游戏规则

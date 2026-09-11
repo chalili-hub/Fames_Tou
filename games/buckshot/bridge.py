@@ -1,6 +1,6 @@
 """
-恶魔轮盘游戏桥接模块 - 作为 Lumi 子模块运行
-TCP 连接 Godot BridgeMod，确定性决策就地执行，不确定局面投递给 Lumi 快脑
+恶魔轮盘游戏桥接模块 - 作为 fames 子模块运行
+TCP 连接 Godot BridgeMod，确定性决策就地执行，不确定局面投递给 fames 快脑
 
 可独立运行（调试用）：python -m games.buckshot.bridge
 """
@@ -65,7 +65,7 @@ C_MAGENTA = "\033[95m"
 C_BOLD = "\033[1m"
 
 
-# ==================== LLM 工具定义（给 Lumi 快脑用）====================
+# ==================== LLM 工具定义（给 fames 快脑用）====================
 
 def build_game_tools(player_items: list, state=None) -> list:
     """根据玩家当前道具+游戏状态动态构建工具列表"""
@@ -185,11 +185,11 @@ class GameState:
         return "\n".join(lines)
 
 
-# ==================== 游戏决策请求（投递给 Lumi 快脑）====================
+# ==================== 游戏决策请求（投递给 fames 快脑）====================
 
 @dataclass
 class GameDecisionRequest:
-    """由 bridge 线程创建，投递给 Lumi 快脑，等待结果"""
+    """由 bridge 线程创建，投递给 fames 快脑，等待结果"""
     state: GameState                    # 游戏状态快照
     state_text: str                     # format_for_llm() 输出
     intel_text: str                     # 已知情报描述
@@ -198,7 +198,7 @@ class GameDecisionRequest:
     game_status: str = "进行中"
     last_action_result: str = ""
     result_event: threading.Event = field(default_factory=threading.Event)
-    result: dict = field(default_factory=dict)  # Lumi 快脑写入决策结果
+    result: dict = field(default_factory=dict)  # fames 快脑写入决策结果
     cancelled: bool = False
 
 
@@ -338,7 +338,7 @@ class DeterministicEngine:
         return {"action": "shoot", "target": "self", "reason": f"兜底：空弹概率{1-p_live:.0%}，射自己"}
 
 
-# ==================== 游戏事件格式化（给 Lumi 看）====================
+# ==================== 游戏事件格式化（给 fames 看）====================
 
 def _format_deterministic_action(decision: dict, controller_name: str = "操作者") -> str:
     """把确定性策略的动作映射成中文 last_action_result。
@@ -407,7 +407,7 @@ def public_known_intel_text(intel_text: str = "") -> str:
 
 class BuckshotBridge:
     EXPECTED_GLOBAL_STATE = "PLAYING_BUCKSHOT"
-    """恶魔轮盘桥接器 —— 可作为 Lumi 子线程或独立运行"""
+    """恶魔轮盘桥接器 —— 可作为 fames 子线程或独立运行"""
 
     def __init__(self, event_callback=None, bus=None, controller_provider=None):
         """
@@ -430,7 +430,7 @@ class BuckshotBridge:
         # 统计
         self.wins = 0
         self.losses = 0
-        # Lumi 快脑决策机制
+        # fames 快脑决策机制
         self.pending_decision: GameDecisionRequest | None = None
         self._pending_lock = threading.Lock()
         # Godot 进程
@@ -554,8 +554,8 @@ class BuckshotBridge:
         name = self._controller_name()
         if not name or name == "操作者":
             # 早期场景下还没拿到真实操作者（bridge 连上 Godot 但状态机没切到 PLAYING_*）。
-            # 仍然要发一个名字让游戏端别拿空字符串签字，"Lumi" 是 1 角色直播的合理默认。
-            name = "Lumi"
+            # 仍然要发一个名字让游戏端别拿空字符串签字，"fames" 是 1 角色直播的合理默认。
+            name = "fames"
         self.send_command({"action": "set_player_name", "name": name})
 
     def receive_messages(self) -> list:
@@ -605,7 +605,7 @@ class BuckshotBridge:
         s.endless = data.get("endless", False)
 
     def _handle_player_turn(self):
-        """玩家回合：确定性决策 → 成功则直接执行，失败则投递给 Lumi 快脑"""
+        """玩家回合：确定性决策 → 成功则直接执行，失败则投递给 fames 快脑"""
         state = self.state
         if not self._is_active_for_decision():
             return
@@ -623,13 +623,13 @@ class BuckshotBridge:
             self.log({"type": "decision", **decision})
             # 把确定性动作写进上一动作（射击事件会被后续 game_event 覆盖；道具使用没 game_event，靠这里）
             self._last_action_result = _format_deterministic_action(decision, self._controller_name())
-            # 通知 Lumi 确定性决策（可用于 TTS 说理由）
+            # 通知 fames 确定性决策（可用于 TTS 说理由）
             self.event_callback("decision_made", decision)
             time.sleep(1.5)
             self.send_command(decision)
             return
 
-        # 第二层：投递给 Lumi 快脑
+        # 第二层：投递给 fames 快脑
         available_items = list(state.player_items)
         if state.health_player >= state.max_health and "cigarettes" in available_items:
             available_items.remove("cigarettes")
@@ -668,9 +668,9 @@ class BuckshotBridge:
             "intel_text": request.intel_text,
         })
 
-        print(f"{C_CYAN}[恶魔轮盘] 等待 Lumi 快脑决策...{C_RESET}")
+        print(f"{C_CYAN}[恶魔轮盘] 等待 fames 快脑决策...{C_RESET}")
 
-        # 等待 Lumi 快脑返回结果（最长 20 秒）
+        # 等待 fames 快脑返回结果（最长 20 秒）
         if request.result_event.wait(timeout=35.0):
             if request.cancelled:
                 return
@@ -678,10 +678,10 @@ class BuckshotBridge:
             decision["_layer"] = "lumi_fast_brain"
             # 校验+模糊匹配：LLM 经常写错道具名
             decision = self._validate_decision(decision, state)
-            self._log_decision("Lumi快脑", decision)
+            self._log_decision("fames快脑", decision)
         else:
             # 超时兜底
-            print(f"{C_RED}[恶魔轮盘] Lumi 快脑超时(20s)，使用兜底策略{C_RESET}")
+            print(f"{C_RED}[恶魔轮盘] fames 快脑超时(20s)，使用兜底策略{C_RESET}")
             decision = self.engine.fallback(state)
             decision["_layer"] = "fallback_timeout"
             self._log_decision("超时兜底", decision)
@@ -775,7 +775,7 @@ class BuckshotBridge:
         )
 
     def get_pending_decision(self) -> GameDecisionRequest | None:
-        """供 Lumi 主线程检查是否有待处理的游戏决策"""
+        """供 fames 主线程检查是否有待处理的游戏决策"""
         with self._pending_lock:
             return self.pending_decision
 
@@ -928,7 +928,7 @@ class BuckshotBridge:
 # ==================== 独立运行入口（调试用）====================
 
 def main():
-    """独立运行：不连接 Lumi，LLM 决策用兜底策略替代"""
+    """独立运行：不连接 fames，LLM 决策用兜底策略替代"""
     bridge = BuckshotBridge()
     bridge.launch_godot()
     print("[Bridge] 等待游戏启动...")
