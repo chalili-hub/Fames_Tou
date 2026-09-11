@@ -1,0 +1,3 @@
+# ml_research 依赖(与 Lumi_Nox 核心协调层无关)
+requests
+python-dotenv

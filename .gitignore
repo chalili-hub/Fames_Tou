@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+
+# tModLoader build output
+games/terraria/mod/**/bin/
+games/terraria/mod/**/obj/
+*.tmod
+
+# Secrets / runtime (never commit)
+config.py
+*token*.txt
+*cookies*.json
+logs/
+recordings/
+*.db
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
