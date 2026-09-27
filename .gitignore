@@ -12,7 +12,9 @@ games/terraria/mod/**/obj/
 *.tmod
 
 # Secrets / runtime (never commit)
-config.py
+# 注意：只忽略仓库根目录的 config.py（本地私密配置）。
+# 不加前导斜杠会匹配任意层级，曾把 launcher/config.py 一起吞掉。
+/config.py
 *token*.txt
 *cookies*.json
 logs/
