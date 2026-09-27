@@ -226,8 +226,18 @@ class StreamAnalytics:
         any_speech = any(st["starts"] for _, st in ordered)
         if not any_speech:
             lines.append("  （本场没有发言记录）")
+        # 累计时长极小时（无声干跑、或 TTS 关闭）按时长算占比会退化成无意义的
+        # "100% / 0%"——分母被 round 到 0 之后仍可能被某一个人的微小非零值撑起来。
+        # 此时改用发言次数算占比，并在报告里写明口径，避免读报告的人被误导。
+        by_count = total_speech <= 1e-6
+        total_starts = sum(st["starts"] for _, st in ordered)
+        if by_count and total_starts:
+            lines.append("  （本场累计时长为 0，占比按发言次数计算）")
         for name, st in ordered:
-            share = (st["total_speech_s"] / total_speech * 100) if total_speech else 0.0
+            if by_count:
+                share = (st["starts"] / total_starts * 100) if total_starts else 0.0
+            else:
+                share = (st["total_speech_s"] / total_speech * 100) if total_speech else 0.0
             lines.append(
                 f"  {name:<10} 发言 {st['starts']} 次   累计 {st['total_speech_s']:.2f}s   "
                 f"占比 {share:.0f}%"

@@ -24,6 +24,17 @@ recordings/
 Thumbs.db
 .idea/
 .vscode/
+__MACOSX/
+*.wav
+
+# 角色人设（私有资产：上游"代码开源、角色不开源"，本层缺文件时会生成占位）
+persona/
 
 # 上游示例角色的立绘（本项目已换成自己的角色，README 不再引用）
 docs/assets/hero.png
+
+# 面试准备材料（个人资料，不随仓库发布）
+面试准备_项目技术点全解.md
+
+# 官方 duplex demo（第三方代码；本仓库的实现在 launcher/duplex_client.py）
+python3.7_duplex_demo/

@@ -72,6 +72,19 @@ _pa_instance = None  # pyaudio.PyAudio
 _sentence_endings = None  # compiled regex
 _monitor_device_index = None
 _event_bus = None  # 由 lumi.py 注入；speak() 用它发 logical tts_done 事件
+# 发声器工厂覆盖：由启动器注入 factory(speaker, cable_index) -> TtsEmitter | None。
+# 返回 None 表示"不由我处理"，继续走默认分流。用于接入新协议（如 duplex）。
+_emitter_factory = None
+
+
+def set_emitter_factory(factory):
+    """注入自定义发声器工厂（launcher 用；传 None 可清除）。
+
+    为什么用注入而不是 import：`lumi_tts` 不该反向依赖启动器包；
+    工厂返回 None 时完全退回原有行为，对 text/realtime 两条老链路零影响。
+    """
+    global _emitter_factory
+    _emitter_factory = factory
 
 
 def init(*, llm_client, llm_model: str, brand_params_fn,
@@ -137,10 +150,22 @@ def _resolve_voice_name(speaker):
 
 def _make_emitter(speaker, cable_index):
     """按运行架构真相源选发声器：
+    - 启动器注入了发声器工厂（如 duplex 架构）→ 用它
     - 文本架构 → 独立 CosyVoice TTS（按角色 voice_name 经音色库解析 voice_id + model，
       支持百炼声音复刻音色）
     - 端到端架构 → 借端到端 say_streaming
     """
+    # 启动器注入的发声器（用于新协议，例如 launcher/duplex_voice.py）。
+    # 用注入而不是直接 import，避免上游模块反向依赖启动器。
+    if _emitter_factory is not None:
+        try:
+            custom = _emitter_factory(speaker, cable_index)
+        except Exception as e:
+            _log_fn(f"{C_ERR}[发声器] 注入的工厂抛错，回退默认分流: {e}{C_RESET}")
+            custom = None
+        if custom is not None:
+            return custom
+
     if run_architecture.use_independent_tts():
         voice_name = _resolve_voice_name(speaker)
         try:

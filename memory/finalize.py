@@ -40,7 +40,11 @@ from memory.summarizer import (
 
 load_dotenv()
 
-MODEL_ID = "doubao-seed-2-0-mini-260215"
+# 记忆蒸馏用的模型。上游写死 mini，但**若账号未开通该模型，会话结束的蒸馏会整批 404**
+# （实测：一场直播结束的 13 次调用全部失败）。这里允许用环境变量覆盖，
+# 留空则保持上游默认值不变。
+MODEL_ID = (os.getenv("ARK_MODEL_ID_MEMORY") or os.getenv("ARK_MODEL_ID")
+            or "doubao-seed-2-0-mini-260215")
 TEMPERATURE = 0.3
 # 思考模式开启后，输出 token 配额需要给思考过程留空间，否则最终 JSON 可能被截断
 MAX_TOKENS = 2000
