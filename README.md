@@ -140,7 +140,7 @@ python -m compileall -q .
 
 ## 许可证与出处
 
-上游项目：[**Lumi_Nox**](https://github.com/MIO-456/Lumi_Nox)（作者 **Mio**，MIT 协议）。
+
 
 本项目的架构与实现沿用其成果，相关版权归原作者所有。
 依据 MIT 协议，使用、修改、分发本项目时需保留版权声明与许可全文，全文见 [LICENSE](LICENSE)。
